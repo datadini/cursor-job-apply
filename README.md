@@ -5,8 +5,9 @@ An intelligent, human-like LinkedIn job application automation system that autom
 ## 🚀 Features
 
 - **Intelligent Job Matching**: Automatically identifies and applies to relevant roles
-- **Customized Resumes**: AI-generated resumes tailored to each specific job
-- **Personalized Cover Letters**: Heartfelt, genuine cover letters for each application
+- **Job Description Scraping**: Reads actual job descriptions and requirements from LinkedIn
+- **AI-Powered Resume Customization**: Creates highly targeted resumes based on real job requirements
+- **Personalized Cover Letters**: Heartfelt, genuine cover letters that reference specific job details
 - **Hiring Manager Outreach**: Connects with and messages hiring managers
 - **Anti-Detection**: Human-like behavior to avoid LinkedIn bot detection
 - **Smart Scheduling**: Takes breaks and operates at human pace
@@ -136,6 +137,20 @@ python resume_generator.py "Data Engineer" "Google"
 python resume_generator.py "AI Engineer" "Microsoft" "my_resume.txt"
 ```
 
+### Manual Job Input for Testing
+
+For testing with real job descriptions:
+
+```bash
+python manual_job_input.py
+```
+
+This utility allows you to:
+- Input job titles and company names
+- Paste full job descriptions from LinkedIn or other sources
+- Specify exact job requirements
+- Generate highly targeted resumes based on real job details
+
 ### Test Resume Generation
 
 ```bash
@@ -148,22 +163,27 @@ python resume_generator.py "Business Intelligence Developer" "Shopee"
 
 ## 🔧 How It Works
 
-### 1. Job Discovery
+### 1. Job Discovery & Analysis
 - Searches LinkedIn for relevant positions
+- **Scrapes full job descriptions and requirements**
+- **Extracts company information and job details**
 - Filters by location and role type
 - Scores jobs by relevance
 
-### 2. Resume Customization
-- Analyzes job requirements
-- Identifies relevant skills from your profile
-- Generates tailored resume using AI
-- Focuses on transferable skills
+### 2. Intelligent Resume Customization
+- **Analyzes actual job descriptions in detail**
+- **Identifies specific requirements and skills needed**
+- **Maps your skills to exact job requirements**
+- Creates highly targeted resumes using AI
+- Focuses on transferable skills and direct matches
+- **References specific technologies/tools mentioned in the job posting**
 
-### 3. Cover Letter Generation
+### 3. Personalized Cover Letter Generation
+- **Reads and understands the job description**
+- **References specific aspects of the role that excite you**
 - Creates personalized, heartfelt letters
-- References specific company and role
-- Incorporates your personal story
-- Maintains authenticity
+- **Shows deep understanding of the company's needs**
+- Maintains authenticity and personal voice
 
 ### 4. Application Process
 - Fills out application forms

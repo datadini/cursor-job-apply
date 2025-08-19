@@ -158,7 +158,7 @@ class ResumeGenerator:
         
         return projects
     
-    def generate_customized_resume(self, profile: Dict, job_info: Dict) -> str:
+    def generate_customized_resume(self, profile: Dict, job_info: Dict, job_description: str = None, job_requirements: List[str] = None) -> str:
         """Generate a customized resume for a specific job"""
         try:
             # Determine job category and required skills
@@ -170,45 +170,88 @@ class ResumeGenerator:
             relevant_skills = self.get_relevant_skills(profile, job_category)
             
             # Create prompt for resume customization
-            prompt = f"""
-            Create a customized, professional resume for a {job_title} position at {company}.
-            
-            Job Requirements (inferred from title): {self.get_job_requirements(job_category)}
-            
-            Candidate Profile:
-            - Name: {profile.get('name', '[Your Name]')}
-            - Current Role: {profile.get('current_role', '[Current Position]')}
-            - Years of Experience: {profile.get('years_experience', '[X]')}
-            - Location: {profile.get('location', '[Your Location]')}
-            - Relevant Skills: {', '.join(relevant_skills)}
-            
-            Experience Summary:
-            {self.format_experience_for_resume(profile)}
-            
-            Education: {self.format_education_for_resume(profile)}
-            Certifications: {', '.join(profile.get('certifications', []))}
-            Projects: {self.format_projects_for_resume(profile)}
-            
-            Requirements:
-            1. Focus on skills and experience most relevant to this specific role
-            2. Use action verbs and quantify achievements where possible
-            3. Keep it honest - don't exaggerate skills the candidate doesn't have
-            4. Format as a clean, professional resume with clear sections
-            5. Highlight transferable skills that could be adapted to this role
-            6. Keep it to 1-2 pages maximum
-            7. Use bullet points for experience and achievements
-            8. Include a professional summary at the top
-            
-            Generate a professional resume that makes the candidate appear as the perfect fit for this specific role.
-            """
+            if job_description and job_requirements:
+                # Use detailed job information if available
+                prompt = f"""
+                Create a customized, professional resume for a {job_title} position at {company}.
+                
+                JOB DESCRIPTION:
+                {job_description[:2000]}
+                
+                SPECIFIC JOB REQUIREMENTS:
+                {chr(10).join([f"- {req}" for req in job_requirements[:15]])}
+                
+                Candidate Profile:
+                - Name: {profile.get('name', '[Your Name]')}
+                - Current Role: {profile.get('current_role', '[Current Position]')}
+                - Years of Experience: {profile.get('years_experience', '[X]')}
+                - Location: {profile.get('location', '[Your Location]')}
+                - Relevant Skills: {', '.join(relevant_skills)}
+                
+                Experience Summary:
+                {self.format_experience_for_resume(profile)}
+                
+                Education: {self.format_education_for_resume(profile)}
+                Certifications: {', '.join(profile.get('certifications', []))}
+                Projects: {self.format_projects_for_resume(profile)}
+                
+                Requirements:
+                1. Analyze the specific job description and requirements above
+                2. Focus on skills and experience that directly match what they're looking for
+                3. Use action verbs and quantify achievements where possible
+                4. Keep it honest - don't exaggerate skills the candidate doesn't have
+                5. Format as a clean, professional resume with clear sections
+                6. Highlight transferable skills that could be adapted to this specific role
+                7. Keep it to 1-2 pages maximum
+                8. Use bullet points for experience and achievements
+                9. Include a professional summary that directly addresses this role
+                10. Tailor the skills section to match the job requirements
+                11. Customize experience descriptions to align with the role's needs
+                12. Reference specific technologies/tools mentioned in the job requirements
+                
+                Generate a professional resume that makes the candidate appear as the perfect fit for this specific role by directly addressing the job requirements.
+                """
+            else:
+                # Fallback to general requirements
+                prompt = f"""
+                Create a customized, professional resume for a {job_title} position at {company}.
+                
+                Job Requirements (inferred from title): {self.get_job_requirements(job_category)}
+                
+                Candidate Profile:
+                - Name: {profile.get('name', '[Your Name]')}
+                - Current Role: {profile.get('current_role', '[Current Position]')}
+                - Years of Experience: {profile.get('years_experience', '[X]')}
+                - Location: {profile.get('location', '[Your Location]')}
+                - Relevant Skills: {', '.join(relevant_skills)}
+                
+                Experience Summary:
+                {self.format_experience_for_resume(profile)}
+                
+                Education: {self.format_education_for_resume(profile)}
+                Certifications: {', '.join(profile.get('certifications', []))}
+                Projects: {self.format_projects_for_resume(profile)}
+                
+                Requirements:
+                1. Focus on skills and experience most relevant to this specific role
+                2. Use action verbs and quantify achievements where possible
+                3. Keep it honest - don't exaggerate skills the candidate doesn't have
+                4. Format as a clean, professional resume with clear sections
+                5. Highlight transferable skills that could be adapted to this role
+                6. Keep it to 1-2 pages maximum
+                7. Use bullet points for experience and achievements
+                8. Include a professional summary at the top
+                
+                Generate a professional resume that makes the candidate appear as the perfect fit for this specific role.
+                """
             
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert resume writer who creates customized, honest, and compelling resumes. Format the output as a clean, professional resume with proper sections and bullet points."},
+                    {"role": "system", "content": "You are an expert resume writer who creates customized, honest, and compelling resumes. When job descriptions are provided, you analyze them in detail and tailor resumes to be the perfect match for specific roles. Format the output as a clean, professional resume with proper sections and bullet points."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=2000,
+                max_tokens=2500,
                 temperature=0.7
             )
             
@@ -322,7 +365,7 @@ PROJECTS
         except Exception as e:
             print(f"Failed to save resume: {e}")
     
-    def generate_resume_for_job(self, job_title: str, company: str, output_file: str = None):
+    def generate_resume_for_job(self, job_title: str, company: str, output_file: str = None, job_description: str = None, job_requirements: List[str] = None):
         """Generate a resume for a specific job"""
         try:
             # Load profile
@@ -335,7 +378,7 @@ PROJECTS
             }
             
             # Generate customized resume
-            resume = self.generate_customized_resume(profile, job_info)
+            resume = self.generate_customized_resume(profile, job_info, job_description, job_requirements)
             
             # Save resume
             if output_file:

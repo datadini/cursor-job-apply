@@ -217,52 +217,6 @@ class LinkedInJobAgent:
             logger.error(f"Login failed: {e}")
             raise
     
-    def search_jobs(self, keyword: str, location: str) -> List[Dict]:
-        """Search for jobs with given keyword and location"""
-        try:
-            logger.info(f"Searching for jobs: {keyword} in {location}")
-            
-            # Navigate to jobs page
-            search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location}&f_E=2%2C3%2C4"
-            self.driver.get(search_url)
-            self.human_delay(3, 6)
-            
-            jobs = []
-            page = 1
-            max_pages = 5  # Limit to avoid detection
-            
-            while page <= max_pages and len(jobs) < 20:
-                # Extract job listings
-                job_cards = self.driver.find_elements(By.CSS_SELECTOR, ".job-search-card")
-                
-                for card in job_cards:
-                    try:
-                        job_info = self.extract_job_info(card)
-                        if job_info and self.is_job_suitable(job_info):
-                            jobs.append(job_info)
-                    except Exception as e:
-                        logger.warning(f"Failed to extract job info: {e}")
-                        continue
-                
-                # Check if there's a next page
-                try:
-                    next_button = self.driver.find_element(By.CSS_SELECTOR, "button[aria-label='Next']")
-                    if next_button.is_enabled():
-                        next_button.click()
-                        self.human_delay(4, 7)
-                        page += 1
-                    else:
-                        break
-                except NoSuchElementException:
-                    break
-            
-            logger.info(f"Found {len(jobs)} suitable jobs for {keyword} in {location}")
-            return jobs
-            
-        except Exception as e:
-            logger.error(f"Job search failed: {e}")
-            return []
-    
     def extract_job_info(self, job_card) -> Optional[Dict]:
         """Extract job information from job card"""
         try:
@@ -287,6 +241,252 @@ class LinkedInJobAgent:
         except Exception as e:
             logger.warning(f"Failed to extract job info: {e}")
             return None
+    
+    def get_job_description(self, job_info: Dict) -> Dict:
+        """Extract detailed job description and requirements from job page"""
+        try:
+            logger.info(f"Extracting job description for {job_info['title']} at {job_info['company']}")
+            
+            # Navigate to job page
+            self.driver.get(job_info['job_url'])
+            self.human_delay(3, 6)
+            
+            # Wait for job description to load
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".job-description"))
+                )
+            except TimeoutException:
+                logger.warning("Job description not found, trying alternative selectors")
+            
+            # Extract job description
+            description = ""
+            try:
+                # Try multiple selectors for job description
+                selectors = [
+                    ".job-description",
+                    ".description__text",
+                    ".show-more-less-html__markup",
+                    "[data-job-description]"
+                ]
+                
+                for selector in selectors:
+                    try:
+                        desc_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                        description = desc_element.text.strip()
+                        if description:
+                            break
+                    except NoSuchElementException:
+                        continue
+                
+                if not description:
+                    # Fallback: try to get any text content from the page
+                    body = self.driver.find_element(By.TAG_NAME, "body")
+                    description = body.text[:5000]  # Limit to first 5000 characters
+                    
+            except Exception as e:
+                logger.warning(f"Failed to extract job description: {e}")
+                description = ""
+            
+            # Extract job requirements/skills
+            requirements = self.extract_job_requirements()
+            
+            # Extract company information
+            company_info = self.extract_company_info()
+            
+            # Extract job details (experience level, job type, etc.)
+            job_details = self.extract_job_details()
+            
+            job_info.update({
+                'description': description,
+                'requirements': requirements,
+                'company_info': company_info,
+                'job_details': job_details
+            })
+            
+            logger.info(f"Successfully extracted job description ({len(description)} chars) and {len(requirements)} requirements")
+            return job_info
+            
+        except Exception as e:
+            logger.error(f"Failed to extract job description: {e}")
+            return job_info
+    
+    def extract_job_requirements(self) -> List[str]:
+        """Extract job requirements and skills from the job description"""
+        try:
+            requirements = []
+            
+            # Look for requirements section
+            requirement_selectors = [
+                ".job-criteria-item__text",
+                ".description__job-criteria-text",
+                ".job-criteria-item",
+                "[data-test-id='job-criteria-item']"
+            ]
+            
+            for selector in requirement_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        text = element.text.strip()
+                        if text and len(text) > 3:
+                            requirements.append(text)
+                    if requirements:
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # If no structured requirements found, try to extract from description
+            if not requirements:
+                try:
+                    desc_element = self.driver.find_element(By.CSS_SELECTOR, ".job-description, .description__text")
+                    desc_text = desc_element.text.lower()
+                    
+                    # Look for common requirement patterns
+                    requirement_patterns = [
+                        r'requirements?:?\s*([^.]*)',
+                        r'qualifications?:?\s*([^.]*)',
+                        r'skills?:?\s*([^.]*)',
+                        r'experience?:?\s*([^.]*)',
+                        r'knowledge of\s*([^.]*)',
+                        r'proficiency in\s*([^.]*)',
+                        r'familiarity with\s*([^.]*)'
+                    ]
+                    
+                    for pattern in requirement_patterns:
+                        matches = re.findall(pattern, desc_text)
+                        for match in matches:
+                            if match.strip() and len(match.strip()) > 5:
+                                requirements.append(match.strip())
+                    
+                    # Remove duplicates and clean up
+                    requirements = list(set(requirements))
+                    requirements = [req for req in requirements if len(req) > 5 and len(req) < 200]
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to extract requirements from description: {e}")
+            
+            return requirements[:20]  # Limit to top 20 requirements
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract job requirements: {e}")
+            return []
+    
+    def extract_company_info(self) -> Dict:
+        """Extract company information from the job page"""
+        try:
+            company_info = {}
+            
+            # Try to extract company size, industry, etc.
+            try:
+                company_size_element = self.driver.find_element(By.CSS_SELECTOR, "[data-test-id='company-size']")
+                company_info['size'] = company_size_element.text.strip()
+            except NoSuchElementException:
+                pass
+            
+            try:
+                industry_element = self.driver.find_element(By.CSS_SELECTOR, "[data-test-id='company-industry']")
+                company_info['industry'] = industry_element.text.strip()
+            except NoSuchElementException:
+                pass
+            
+            try:
+                company_description = self.driver.find_element(By.CSS_SELECTOR, ".company-description, .about-us__description")
+                company_info['description'] = company_description.text.strip()[:500]
+            except NoSuchElementException:
+                pass
+            
+            return company_info
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract company info: {e}")
+            return {}
+    
+    def extract_job_details(self) -> Dict:
+        """Extract job details like experience level, job type, etc."""
+        try:
+            job_details = {}
+            
+            # Look for job criteria
+            criteria_selectors = [
+                ".job-criteria-item",
+                ".description__job-criteria-item"
+            ]
+            
+            for selector in criteria_selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for element in elements:
+                        try:
+                            label_element = element.find_element(By.CSS_SELECTOR, ".job-criteria-item__label")
+                            value_element = element.find_element(By.CSS_SELECTOR, ".job-criteria-item__text")
+                            
+                            label = label_element.text.strip().lower()
+                            value = value_element.text.strip()
+                            
+                            if label and value:
+                                job_details[label] = value
+                        except NoSuchElementException:
+                            continue
+                except NoSuchElementException:
+                    continue
+            
+            return job_details
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract job details: {e}")
+            return {}
+    
+    def search_jobs(self, keyword: str, location: str) -> List[Dict]:
+        """Search for jobs with given keyword and location"""
+        try:
+            logger.info(f"Searching for jobs: {keyword} in {location}")
+            
+            # Navigate to jobs page
+            search_url = f"https://www.linkedin.com/jobs/search/?keywords={keyword}&location={location}&f_E=2%2C3%2C4"
+            self.driver.get(search_url)
+            self.human_delay(3, 6)
+            
+            jobs = []
+            page = 1
+            max_pages = 5  # Limit to avoid detection
+            
+            while page <= max_pages and len(jobs) < 20:
+                # Extract job listings
+                job_cards = self.driver.find_elements(By.CSS_SELECTOR, ".job-search-card")
+                
+                for card in job_cards:
+                    try:
+                        job_info = self.extract_job_info(card)
+                        if job_info and self.is_job_suitable(job_info):
+                            # Extract detailed job description
+                            detailed_job = self.get_job_description(job_info)
+                            jobs.append(detailed_job)
+                            
+                            # Add delay between job detail extractions
+                            self.human_delay(2, 4)
+                    except Exception as e:
+                        logger.warning(f"Failed to extract job info: {e}")
+                        continue
+                
+                # Check if there's a next page
+                try:
+                    next_button = self.driver.find_element(By.CSS_SELECTOR, "button[aria-label='Next']")
+                    if next_button.is_enabled():
+                        next_button.click()
+                        self.human_delay(4, 7)
+                        page += 1
+                    else:
+                        break
+                except NoSuchElementException:
+                    break
+            
+            logger.info(f"Found {len(jobs)} suitable jobs for {keyword} in {location}")
+            return jobs
+            
+        except Exception as e:
+            logger.error(f"Job search failed: {e}")
+            return []
     
     def get_matching_keyword(self, job_title: str) -> str:
         """Determine which keyword category the job matches"""
@@ -330,37 +530,61 @@ class LinkedInJobAgent:
             job_title = job_info['title']
             company = job_info['company']
             
+            # Get detailed job information
+            job_description = job_info.get('description', '')
+            job_requirements = job_info.get('requirements', [])
+            company_info = job_info.get('company_info', {})
+            job_details = job_info.get('job_details', {})
+            
             # Get relevant skills for this job category
             relevant_skills = self.get_relevant_skills(job_category)
             
-            # Create prompt for resume customization
+            # Create comprehensive prompt for resume customization
             prompt = f"""
-            Create a customized resume for a {job_title} position at {company}.
+            Create a customized, professional resume for a {job_title} position at {company}.
             
-            Job Requirements (inferred from title): {self.get_job_requirements(job_category)}
+            JOB DETAILS:
+            - Title: {job_title}
+            - Company: {company}
+            - Company Size: {company_info.get('size', 'Not specified')}
+            - Industry: {company_info.get('industry', 'Not specified')}
+            - Experience Level: {job_details.get('seniority level', 'Not specified')}
+            - Employment Type: {job_details.get('employment type', 'Not specified')}
             
-            Candidate Profile:
+            JOB DESCRIPTION:
+            {job_description[:2000] if job_description else 'No detailed description available'}
+            
+            SPECIFIC JOB REQUIREMENTS:
+            {chr(10).join([f"- {req}" for req in job_requirements[:15]]) if job_requirements else 'No specific requirements listed'}
+            
+            CANDIDATE PROFILE:
             - Skills: {', '.join(relevant_skills)}
             - Experience: {self.format_experience_for_resume()}
             
-            Requirements:
-            1. Focus on skills and experience most relevant to this specific role
-            2. Use action verbs and quantify achievements where possible
-            3. Keep it honest - don't exaggerate skills the candidate doesn't have
-            4. Format as a clean, professional resume
-            5. Highlight transferable skills that could be adapted to this role
-            6. Keep it to 1-2 pages maximum
+            RESUME CUSTOMIZATION REQUIREMENTS:
+            1. Analyze the specific job description and requirements above
+            2. Focus on skills and experience that directly match what they're looking for
+            3. Use action verbs and quantify achievements where possible
+            4. Keep it honest - don't exaggerate skills the candidate doesn't have
+            5. Format as a clean, professional resume with clear sections
+            6. Highlight transferable skills that could be adapted to this specific role
+            7. Keep it to 1-2 pages maximum
+            8. Use bullet points for experience and achievements
+            9. Include a professional summary that directly addresses this role
+            10. Tailor the skills section to match the job requirements
+            11. Customize experience descriptions to align with the role's needs
+            12. Reference specific technologies/tools mentioned in the job requirements
             
-            Generate a professional resume that makes the candidate appear as the perfect fit for this specific role.
+            Generate a professional resume that makes the candidate appear as the perfect fit for this specific role by directly addressing the job requirements and company needs.
             """
             
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert resume writer who creates customized, honest, and compelling resumes."},
+                    {"role": "system", "content": "You are an expert resume writer who creates highly customized, honest, and compelling resumes. You analyze job descriptions in detail and tailor resumes to be the perfect match for specific roles. Format the output as a clean, professional resume with proper sections and bullet points."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1500,
+                max_tokens=2500,
                 temperature=0.7
             )
             
@@ -433,34 +657,58 @@ class LinkedInJobAgent:
             company = job_info['company']
             position = job_info['title']
             
+            # Get detailed job information
+            job_description = job_info.get('description', '')
+            job_requirements = job_info.get('requirements', [])
+            company_info = job_info.get('company_info', {})
+            job_details = job_info.get('job_details', {})
+            
             # Get personal notes from profile
             personal_notes = self.profile.get('personal_notes', '')
             
             prompt = f"""
             Create a heartfelt and genuine cover letter for a {position} position at {company}.
             
-            Personal Context from Candidate:
+            JOB DETAILS:
+            - Position: {position}
+            - Company: {company}
+            - Company Size: {company_info.get('size', 'Not specified')}
+            - Industry: {company_info.get('industry', 'Not specified')}
+            - Experience Level: {job_details.get('seniority level', 'Not specified')}
+            
+            JOB DESCRIPTION:
+            {job_description[:1500] if job_description else 'No detailed description available'}
+            
+            SPECIFIC JOB REQUIREMENTS:
+            {chr(10).join([f"- {req}" for req in job_requirements[:10]]) if job_requirements else 'No specific requirements listed'}
+            
+            PERSONAL CONTEXT FROM CANDIDATE:
             {personal_notes}
             
-            Requirements:
+            COVER LETTER REQUIREMENTS:
             1. Make it personal and genuine - not generic
-            2. Explain why the candidate is excited about this specific role and company
-            3. Connect the candidate's background to the role requirements
-            4. Keep it honest and authentic
-            5. Show enthusiasm and passion
-            6. Keep it to 2-3 paragraphs maximum
-            7. Make it specific to this company and role
+            2. Reference specific aspects of the job description that excite you
+            3. Explain why the candidate is excited about this specific role and company
+            4. Connect the candidate's background to the specific role requirements
+            5. Show you've read and understood the job description
+            6. Keep it honest and authentic
+            7. Show enthusiasm and passion for the specific role
+            8. Keep it to 2-3 paragraphs maximum
+            9. Make it specific to this company and role
+            10. Address how the candidate's skills align with the job requirements
+            11. Show understanding of the company's industry and challenges
+            12. End with a specific call to action
             
-            Generate a compelling cover letter that shows genuine interest and fits the candidate's voice.
+            Generate a compelling cover letter that shows genuine interest in this specific role and demonstrates understanding of the company's needs.
             """
             
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert cover letter writer who creates genuine, heartfelt, and compelling cover letters."},
+                    {"role": "system", "content": "You are an expert cover letter writer who creates genuine, heartfelt, and compelling cover letters. You analyze job descriptions in detail and create personalized letters that show deep understanding of the role and company."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=800,
+                max_tokens=1000,
                 temperature=0.8
             )
             
