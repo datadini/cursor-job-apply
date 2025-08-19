@@ -1,0 +1,60 @@
+# LinkedIn Job Application Automation Configuration
+
+linkedin:
+  email: "your_email@example.com"
+  password: "your_password"
+  headless: false  # Set to true for headless mode
+  slow_mode: true  # Enable human-like behavior
+
+# OpenAI API Configuration
+openai_api_key: "your_openai_api_key_here"
+
+# Job Search Configuration
+job_search:
+  keywords:
+    - "data engineer"
+    - "data analyst"
+    - "ai engineer"
+    - "business intelligence developer"
+    - "ai prototyper"
+  
+  locations:
+    - "Singapore"
+    - "Hong Kong"
+  
+  experience_levels:
+    - "Entry level"
+    - "Associate"
+    - "Mid-Senior level"
+  
+  max_applications_per_session: 50
+  min_delay_between_applications: 3
+  max_delay_between_applications: 8
+
+# Resume Customization Settings
+resume_customization:
+  max_skills_to_highlight: 8
+  achievement_focus: true
+  quantify_results: true
+
+# Anti-Detection Settings
+anti_detection:
+  random_delays: true
+  human_typing: true
+  random_breaks: true
+  break_interval: 15  # Take break every 15 applications
+  break_duration_min: 30  # Minimum break duration in seconds
+  break_duration_max: 120  # Maximum break duration in seconds
+
+# LinkedIn Outreach Settings
+outreach:
+  enable_hiring_manager_contact: true
+  connection_request_probability: 0.3  # 30% chance to reach out
+  personalized_messages: true
+  follow_up_delay_hours: 24  # Wait 24 hours before follow-up
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  save_session_results: true
+  log_file: "linkedin_agent.log"
