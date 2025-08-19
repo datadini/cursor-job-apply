@@ -8,6 +8,8 @@ An intelligent, human-like LinkedIn job application automation system that autom
 - **Job Description Scraping**: Reads actual job descriptions and requirements from LinkedIn
 - **AI-Powered Resume Customization**: Creates highly targeted resumes based on real job requirements
 - **Personalized Cover Letters**: Heartfelt, genuine cover letters that reference specific job details
+- **Comprehensive Application Handling**: Handles LinkedIn Easy Apply and external company career sites
+- **External Form Support**: Automatically detects and fills out Workday, Lever, Greenhouse, and other systems
 - **Hiring Manager Outreach**: Connects with and messages hiring managers
 - **Anti-Detection**: Human-like behavior to avoid LinkedIn bot detection
 - **Smart Scheduling**: Takes breaks and operates at human pace
@@ -186,16 +188,45 @@ python resume_generator.py "Business Intelligence Developer" "Shopee"
 - Maintains authenticity and personal voice
 
 ### 4. Application Process
-- Fills out application forms
-- Uploads customized materials
-- Submits applications
-- Records results
+- **LinkedIn Easy Apply**: Automatically fills out LinkedIn's built-in forms
+- **External Career Sites**: Handles redirects to company career pages
+- **Form Detection**: Automatically identifies Workday, Lever, Greenhouse, BambooHR, and generic forms
+- **Field Mapping**: Maps form fields and fills them with appropriate data
+- **File Uploads**: Handles resume and cover letter uploads
+- **Form Submission**: Submits applications and verifies success
+- **Records results**
 
 ### 5. Hiring Manager Outreach
 - Identifies relevant contacts
 - Sends personalized connection requests
 - Follows up with messages
 - Builds professional relationships
+
+## 🏢 Supported Application Systems
+
+### LinkedIn Easy Apply
+- **Automatic Detection**: Identifies LinkedIn's built-in application forms
+- **Resume Upload**: Handles file uploads with proper formatting
+- **Field Filling**: Automatically fills required and optional fields
+- **Cover Letter**: Adds personalized cover letters when possible
+- **Form Submission**: Submits applications and verifies success
+
+### External Career Sites
+The system automatically detects and handles applications on:
+
+- **Workday**: Enterprise HR system used by large companies
+- **Lever**: Modern ATS popular with startups and tech companies
+- **Greenhouse**: Comprehensive recruitment software
+- **BambooHR**: HR management system for growing companies
+- **Generic Forms**: Custom forms with intelligent field detection
+
+### Form Field Mapping
+- **Automatic Detection**: Identifies form types and field purposes
+- **Smart Filling**: Fills fields with appropriate data based on context
+- **Required Fields**: Prioritizes mandatory fields
+- **Optional Fields**: Intelligently fills relevant optional fields
+- **File Handling**: Manages resume and cover letter uploads
+- **Validation**: Ensures forms are properly completed before submission
 
 ## 🛡️ Anti-Detection Features
 

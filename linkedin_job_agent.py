@@ -21,6 +21,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import undetected_chromedriver as uc
+from linkedin_outreach_agent import LinkedInOutreachAgent
+from linkedin_application_handler import LinkedInApplicationHandler
+from external_form_mapper import ExternalFormMapper
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +53,11 @@ class LinkedInJobAgent:
         self.max_delay = 8
         self.break_interval = 15  # Take a break every 15 applications
         self.break_duration = (30, 120)  # Random break between 30-120 seconds
+        
+        # Initialize handlers
+        self.outreach_agent = None
+        self.application_handler = None
+        self.external_form_mapper = None
         
     def load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file"""
@@ -174,6 +182,11 @@ class LinkedInJobAgent:
             # Use undetected-chromedriver for better anti-detection
             self.driver = uc.Chrome(options=options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            # Initialize handlers
+            self.outreach_agent = LinkedInOutreachAgent(self.driver, self.config)
+            self.application_handler = LinkedInApplicationHandler(self.driver, self.config)
+            self.external_form_mapper = ExternalFormMapper(self.driver, self.config)
             
             logger.info("Chrome driver setup completed successfully")
             
@@ -735,7 +748,7 @@ class LinkedInJobAgent:
         """
     
     def apply_to_job(self, job_info: Dict) -> bool:
-        """Apply to a specific job"""
+        """Apply to a specific job using comprehensive application handling"""
         try:
             logger.info(f"Applying to {job_info['title']} at {job_info['company']}")
             
@@ -743,99 +756,38 @@ class LinkedInJobAgent:
             self.driver.get(job_info['job_url'])
             self.human_delay(3, 6)
             
-            # Look for apply button
-            try:
-                apply_button = WebDriverWait(self.driver, 10).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "button[data-control-name='jobdetails_topcard_inapply']"))
-                )
-                apply_button.click()
-                self.human_delay(2, 4)
-                
-                # Handle application form
-                success = self.handle_application_form(job_info)
-                
-                if success:
-                    self.jobs_applied.append(job_info)
-                    logger.info(f"Successfully applied to {job_info['title']} at {job_info['company']}")
-                    return True
-                else:
-                    logger.warning(f"Failed to complete application for {job_info['title']}")
-                    return False
-                    
-            except TimeoutException:
-                logger.warning(f"Apply button not found for {job_info['title']}")
+            # Generate customized resume and cover letter
+            resume = self.generate_customized_resume(job_info)
+            cover_letter = self.generate_cover_letter(job_info)
+            
+            # Use the comprehensive application handler
+            success = self.application_handler.handle_application_form(job_info, resume, cover_letter)
+            
+            if success:
+                self.jobs_applied.append(job_info)
+                logger.info(f"Successfully applied to {job_info['title']} at {job_info['company']}")
+                return True
+            else:
+                logger.warning(f"Failed to complete application for {job_info['title']}")
                 return False
                 
         except Exception as e:
             logger.error(f"Application failed for {job_info['title']}: {e}")
             return False
     
-    def handle_application_form(self, job_info: Dict) -> bool:
-        """Handle the job application form"""
-        try:
-            # Generate customized resume and cover letter
-            resume = self.generate_customized_resume(job_info)
-            cover_letter = self.generate_cover_letter(job_info)
-            
-            # Look for form fields and fill them
-            # This is a simplified version - actual implementation would need to handle various form layouts
-            
-            # Try to find and fill resume upload
-            try:
-                resume_input = self.driver.find_element(By.CSS_SELECTOR, "input[type='file']")
-                # For now, we'll just note that we have the resume content
-                logger.info("Resume content generated and ready")
-            except NoSuchElementException:
-                logger.info("No file upload field found")
-            
-            # Try to find and fill cover letter field
-            try:
-                cover_letter_field = self.driver.find_element(By.CSS_SELECTOR, "textarea[name*='cover'], textarea[name*='letter']")
-                self.human_type(cover_letter_field, cover_letter)
-                logger.info("Cover letter filled")
-            except NoSuchElementException:
-                logger.info("No cover letter field found")
-            
-            # Submit application
-            try:
-                submit_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], button[data-control-name*='submit']")
-                submit_button.click()
-                self.human_delay(3, 6)
-                
-                # Check if application was successful
-                success_indicators = [
-                    "Application submitted",
-                    "Thank you for your application",
-                    "Application received"
-                ]
-                
-                page_text = self.driver.page_source.lower()
-                if any(indicator.lower() in page_text for indicator in success_indicators):
-                    return True
-                else:
-                    return False
-                    
-            except NoSuchElementException:
-                logger.warning("Submit button not found")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to handle application form: {e}")
-            return False
-    
     def reach_out_to_hiring_managers(self, job_info: Dict):
         """Attempt to reach out to hiring managers on LinkedIn"""
         try:
-            # This would require additional LinkedIn automation
-            # For now, we'll just log the intention
-            logger.info(f"Would reach out to hiring managers for {job_info['title']} at {job_info['company']}")
-            
-            # In a full implementation, this would:
-            # 1. Search for company employees on LinkedIn
-            # 2. Identify hiring managers/recruiters
-            # 3. Send personalized connection requests
-            # 4. Follow up with messages
-            
+            if self.outreach_agent:
+                # Use the comprehensive outreach agent
+                result = self.outreach_agent.execute_outreach_strategy(job_info)
+                if result['success']:
+                    logger.info(f"Outreach strategy executed: {result['connections_sent']} connections sent")
+                else:
+                    logger.warning(f"Outreach strategy failed: {result['reason']}")
+            else:
+                logger.warning("Outreach agent not initialized")
+                
         except Exception as e:
             logger.error(f"Failed to reach out to hiring managers: {e}")
     
